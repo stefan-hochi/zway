@@ -59,7 +59,7 @@ sub getAlarm {
 	while(scalar(@array) !=0)
 	{
 		my $cell=shift(@array);
-		if ($cell->[1] =~ /off/) {
+		if ($cell->[1] =~ /on/) {
 			push(@alarmarray,$cell);
 		}
 	}

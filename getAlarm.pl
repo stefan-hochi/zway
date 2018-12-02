@@ -23,7 +23,7 @@ if (not $session->{code} =~ /200/) {
 my @array = getDevices({ api => $api, session => $session });
 my $array = getAlarm({ api => $api, array => \@array  });
 
-print $array;
+print Dumper($array);
 
 sub getAlarm {
 	my $param = shift;
@@ -61,7 +61,11 @@ sub getTemperature {
 	if ($postparams) {
 		$postparams = "Temperature,Temperature=Fibaro" . " " . $postparams;
 	}
-	print Dumper($postparams);
+	my $request = HTTP::Request->new(POST => "http://" . $api . ":8086/write?db=mydb");
+	$request->content($postparams);
+	my $ua = new LWP::UserAgent();
+	my $post = $ua->request($request);
+	return $post;
 }
 
 sub getDevices

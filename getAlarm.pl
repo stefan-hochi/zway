@@ -19,60 +19,17 @@ if (not $session->{code} =~ /200/) {
 } else {
 	$session = $session->{data}->{sid};
 }
-
-my @array = getDevices({ api => $api, session => $session });
-my $array = getAlarm({ api => $api, array => \@array  });
-
-print Dumper($array);
-
-sub getAlarm {
-	my $param = shift;
-	my $api = $param->{'api'};
-	my @array = @{$param->{'array'}};
-	my @temperaturearray;
-	for my $temperature (@array) {
-		if ($temperature->{probeType} =~ /alarmSensor_smoke|alarm_smoke/) {
-			if ($temperature->{level} =~ /on/) {
-				my @cell = ($temperature->{title},$temperature->{level});
-				push(@temperaturearray,\@cell);
-			}
-		}
-	}
-	my $postparams = join ",", map { join "=", @$_ } @temperaturearray;
-	if ($postparams) {
-		$postparams = "Brandmeldealarm" . " " . $postparams;
-	}
-	return $postparams;
-}
-
-sub getTemperature {
-	my $param = shift;
-	my $api = $param->{'api'};
-	my @array = @{$param->{'array'}};
-	my @temperaturearray;
-	for my $temperature (@array) {
-		if ($temperature->{probeType} =~ /temperature/) {
-			my $level = nearest('0.1',$temperature->{level});
-			my @cell = ($temperature->{title},$level);
-			push(@temperaturearray,\@cell);
-		}
-	}
-	my $postparams = join ",", map { join "=", @$_ } @temperaturearray;
-	if ($postparams) {
-		$postparams = "Temperature,Temperature=Fibaro" . " " . $postparams;
-	}
-	my $request = HTTP::Request->new(POST => "http://" . $api . ":8086/write?db=mydb");
-	$request->content($postparams);
-	my $ua = new LWP::UserAgent();
-	my $post = $ua->request($request);
-	return $post;
-}
+my @room = getRoom({ api => $api, session => $session });
+my @devices = getDevices({ api => $api, session => $session, room => \@room });
+my $array = getAlarm({ api => $api, array => \@devices });
+print $array;
 
 sub getDevices
 {
 	my $param = shift;
 	my $api = $param->{'api'};
 	my $session = $param->{'session'};
+	my @room = @{$param->{'room'}};
 	my $ua = new LWP::UserAgent();
 	my $cookie_jar = HTTP::Cookies->new();
 	$cookie_jar->set_cookie(0,"ZWAYSession", $session,"/",$api);
@@ -85,17 +42,91 @@ sub getDevices
 	my $data = decode_json $response->decoded_content();
 	my @array;
 	for my $devices ($data->{data}->{devices}->@*) {
+		my @location = map { $_->{id} =~ $devices->{location} ? ($_->{title}) : () } @room;
 		my $title = $devices->{metrics}->{title};
 		$title =~ s/([#() ])//g;
 		my $cell = {
 			title => $title,
 			id => $devices->{id},
+			location => shift @location,
 			level => $devices->{metrics}->{level},
 			probeType => $devices->{probeType}
 		};
 		push(@array,$cell);
 	}
 	return @array;
+}
+
+sub getRoom
+{
+	my $param = shift;
+	my $api = $param->{'api'};
+	my $session = $param->{'session'};
+	my $ua = new LWP::UserAgent();
+	my $cookie_jar = HTTP::Cookies->new();
+	$cookie_jar->set_cookie(0,"ZWAYSession", $session,"/",$api);
+	$ua->cookie_jar($cookie_jar);
+
+	my $request = HTTP::Request->new(GET => "http://" . $api . ":8083/ZAutomation/api/v1/locations");
+	$request->header("Accept" => 'application/json');
+	$request->header("Content-Type" => 'application/json');
+	my $response = $ua->request($request);
+	my $data = decode_json $response->decoded_content();
+	my @tmpArray;
+	for my $rooms ($data->{data}->@*) {
+		my $cell = {
+			title => $rooms->{title},
+			id => $rooms->{id}
+		};
+		push(@tmpArray,$cell);
+	}
+
+	return @tmpArray;
+}
+
+sub getAlarm {
+	my $param = shift;
+	my $api = $param->{'api'};
+	my @array = @{$param->{'array'}};
+	my @tmpArray;
+	for my $temperature (@array) {
+		if ($temperature->{probeType} =~ /alarmSensor_smoke|alarm_smoke/) {
+			if ($temperature->{level} =~ /on/) {
+				my $title = $temperature->{location} . $temperature->{title};
+				my @cell = ($title,$temperature->{level});
+				push(@tmpArray,\@cell);
+			}
+		}
+	}
+	my $postparams = join ",", map { join "=", @$_ } @tmpArray;
+	if ($postparams) {
+		$postparams = "Brandmeldealarm" . " " . $postparams;
+	}
+	return $postparams;
+}
+
+sub getTemperature {
+	my $param = shift;
+	my $api = $param->{'api'};
+	my @array = @{$param->{'array'}};
+	my @tmpArray;
+	for my $temperature (@array) {
+		if ($temperature->{probeType} =~ /temperature/) {
+			my $level = nearest('0.1',$temperature->{level});
+			my $title = $temperature->{location} . $temperature->{title};
+			my @cell = ($title,$level);
+			push(@tmpArray,\@cell);
+		}
+	}
+	my $postparams = join ",", map { join "=", @$_ } @tmpArray;
+	if ($postparams) {
+		$postparams = "Temperature,Temperature=Fibaro" . " " . $postparams;
+	}
+	my $request = HTTP::Request->new(POST => "http://" . $api . ":8086/write?db=mydb");
+	$request->content($postparams);
+	my $ua = new LWP::UserAgent();
+	my $post = $ua->request($request);
+	return $post;
 }
 
 sub getSession

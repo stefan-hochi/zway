@@ -9,7 +9,7 @@ use Math::Round qw/nearest/;
 
 use Data::Dumper;
 
-my $api = "192.168.88.215";
+my $api = "192.168.88.2";
 my $username = "admin";
 my $password = "password";
 
@@ -22,7 +22,7 @@ if (not $session->{code} =~ /200/) {
 my @room = getRoom({ api => $api, session => $session });
 my @devices = getDevices({ api => $api, session => $session, room => \@room });
 my $array = getAlarm({ api => $api, array => \@devices });
-print $array;
+print $array;              
 
 sub getDevices
 {
@@ -80,7 +80,6 @@ sub getRoom
 		};
 		push(@tmpArray,$cell);
 	}
-
 	return @tmpArray;
 }
 
@@ -92,13 +91,15 @@ sub getAlarm {
 	for my $temperature (@array) {
 		if ($temperature->{probeType} =~ /alarmSensor_smoke|alarm_smoke/) {
 			if ($temperature->{level} =~ /on/) {
-				my $title = $temperature->{location} . $temperature->{title};
-				my @cell = ($title,$temperature->{level});
-				push(@tmpArray,\@cell);
+				my @cell = ($temperature->{location} . $temperature->{title},$temperature->{level});
+				push(@tmpArray, map { join "=", @$_ } \@cell);
+				#push(@tmpArray,\@cell);
 			}
 		}
 	}
-	my $postparams = join ",", map { join "=", @$_ } @tmpArray;
+	#my $postparams = join ",", map { join "=", @$_ } @tmpArray;
+	my %hash   = map { $_ => 1 } @tmpArray;
+	my $postparams = join ",", map { $_ } keys %hash;
 	if ($postparams) {
 		$postparams = "Brandmeldealarm" . " " . $postparams;
 	}

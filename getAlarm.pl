@@ -6,30 +6,36 @@ use HTTP::Request;
 use HTTP::Cookies;
 use JSON::MaybeXS qw(encode_json decode_json);
 use Math::Round qw/nearest/;
+use MIME::Base64 qw(encode_base64 decode_base64);
 
 use Data::Dumper;
 
 my $api = "192.168.88.2";
 my $username = "admin";
-my $password = "password";
+my $password = "cGFzc3dvcmQ=";
 
 my $session = getSession({ api => $api, username => $username, password => $password });
 if (not $session->{code} =~ /200/) {
-	print ($session->{message});
+	print $session->{message} . "\n";
 } else {
 	$session = $session->{data}->{sid};
 }
-my @room = getRoom({ api => $api, session => $session });
-my @devices = getDevices({ api => $api, session => $session, room => \@room });
+my @devices = getDevices({ api => $api, session => $session });
+
+#my $array = getTemperature({ api => $api, username => $username, password => $password, array => \@devices });
+#if (not $array->{_rc} =~ /204/) {
+#	print $array->{_msg} . "\n";
+#}
+
 my $array = getAlarm({ api => $api, array => \@devices });
-print $array;              
+print $array;
 
 sub getDevices
 {
 	my $param = shift;
 	my $api = $param->{'api'};
 	my $session = $param->{'session'};
-	my @room = @{$param->{'room'}};
+	my @room = getRoom({ api => $api, session => $session });
 	my $ua = new LWP::UserAgent();
 	my $cookie_jar = HTTP::Cookies->new();
 	$cookie_jar->set_cookie(0,"ZWAYSession", $session,"/",$api);
@@ -80,6 +86,7 @@ sub getRoom
 		};
 		push(@tmpArray,$cell);
 	}
+
 	return @tmpArray;
 }
 
@@ -109,6 +116,8 @@ sub getAlarm {
 sub getTemperature {
 	my $param = shift;
 	my $api = $param->{'api'};
+	my $username = $param->{'username'};
+	my $password = $param->{'password'};
 	my @array = @{$param->{'array'}};
 	my @tmpArray;
 	for my $temperature (@array) {
@@ -123,7 +132,9 @@ sub getTemperature {
 	if ($postparams) {
 		$postparams = "Temperature,Temperature=Fibaro" . " " . $postparams;
 	}
+	my $authheader = "Basic " . encode_base64($username . ":" . decode_base64($password));
 	my $request = HTTP::Request->new(POST => "http://" . $api . ":8086/write?db=mydb");
+	$request->header("Authorization" => $authheader);
 	$request->content($postparams);
 	my $ua = new LWP::UserAgent();
 	my $post = $ua->request($request);
@@ -135,7 +146,7 @@ sub getSession
 	my $param = shift;
 	my $api = $param->{'api'};
 	my $username = $param->{'username'};
-	my $password = $param->{'password'};
+	my $password = decode_base64($param->{'password'});
 	
 	my $header = HTTP::Headers->new;
 	$header->push_header("Accept" => 'application/json');

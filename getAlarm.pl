@@ -12,7 +12,7 @@ use Data::Dumper;
 
 my $api = "192.168.88.2";
 my $username = "admin";
-my $password = "cGFzc3dvcmQ=";
+my $password = "password";
 
 my $session = getSession({ api => $api, username => $username, password => $password });
 if (not $session->{code} =~ /200/) {
@@ -132,7 +132,7 @@ sub getTemperature {
 	if ($postparams) {
 		$postparams = "Temperature,Temperature=Fibaro" . " " . $postparams;
 	}
-	my $authheader = "Basic " . encode_base64($username . ":" . decode_base64($password));
+	my $authheader = "Basic " . encode_base64($username . ":" . $password);
 	my $request = HTTP::Request->new(POST => "http://" . $api . ":8086/write?db=mydb");
 	$request->header("Authorization" => $authheader);
 	$request->content($postparams);
@@ -146,7 +146,7 @@ sub getSession
 	my $param = shift;
 	my $api = $param->{'api'};
 	my $username = $param->{'username'};
-	my $password = decode_base64($param->{'password'});
+	my $password = $param->{'password'};
 	
 	my $header = HTTP::Headers->new;
 	$header->push_header("Accept" => 'application/json');

@@ -35,4 +35,9 @@ my $alarm = zway::getAlarm({ devices => \@devices });
 my $temperature = zway::getTemperature({ devices => \@devices });
 my $logout = zway::setLogout({ api => $api, session => $session });
 
-print $alarm;
+my $authheader = "Basic " . encode_base64($username . ":" . $password);
+my $request = HTTP::Request->new(POST => "http://" . $api . ":8086/write?db=mydb");
+$request->header("Authorization" => $authheader);
+$request->content($temperature);
+my $ua = new LWP::UserAgent();
+my $post = $ua->request($request);
